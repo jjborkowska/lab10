@@ -1,46 +1,79 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy to GitHub Pages
+# .github/workflows/deploy-vite.yml
+
+name: Deploy Vite App to GitHub Pages
+
 on:
-  # Runs on pushes targeting the default branch
+  # Runs on pushes targeting the default branch (e.g., main or master)
   push:
-    branches: ['main']
+    branches:
+      - main # Or your default branch name
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-# Sets the GITHUB_TOKEN permissions to allow deployment to GitHub Pages
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
-# Allow one concurrent deployment
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
-  group: 'pages'
-  cancel-in-progress: true
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
+    name: Build Vite App
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Set up Node
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: '20' # Specify a recent LTS version of Node.js
+          cache: 'npm' # Or 'yarn' or 'pnpm' depending on your package manager
+
       - name: Install dependencies
-        run: npm install
-      - name: Build
-        run: npm run build
-      - name: Setup Pages
-        uses: actions/configure-pages@v3
-      - name: Upload artifact
+        run: npm ci # 'ci' is generally recommended for CI for faster, more reliable builds
+        # Or: yarn install --frozen-lockfile
+        # Or: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: npm run build # This command should trigger your Vite build process
+        # Vite typically outputs the build to a 'dist' directory.
+        # If your Vite 'base' config needs to be dynamic for GitHub Pages (e.g., /repo-name/),
+        # ensure it's correctly set in vite.config.js or via an environment variable here.
+        # Example for setting base path if not deploying to root of a custom domain:
+        # env:
+        #   VITE_APP_BASE: /${{ github.event.repository.name }}/ # Then use import.meta.env.VITE_APP_BASE in vite.config.js
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+        # This action configures GitHub Pages for deployment.
+        # It works in conjunction with actions/deploy-pages.
+
+      - name: Upload build artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload dist repository
-          path: './dist'
+          # Path to the directory containing the built assets
+          path: './dist' # Default output directory for Vite
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build # This job runs only after the 'build' job is successful
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }} # Sets the deployment URL in the GitHub environment
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v4
+        # This action handles the deployment of the artifact uploaded by upload-pages-artifact
+        # to your GitHub Pages site.
+        # Ensure your repository settings are configured to deploy from GitHub Actions.
+        # (Settings > Pages > Build and deployment > Source: "GitHub Actions")
